@@ -1,0 +1,10 @@
+# Telemetria e logs gerados em tempo de execução
+telemetry.jsonl
+*.log
+
+# Dependências
+node_modules/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db

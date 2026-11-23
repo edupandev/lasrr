@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velocímetro Laser de Barreira Dupla - Meskernel PTFH</title>
+  <style>
+    :root {
+      --bg-main: #0d1117;
+      --bg-card: #161b22;
+      --border-color: #30363d;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent-laser: #ff3344;
+      --sensor-a-color: #58a6ff;
+      --sensor-b-color: #f0883e;
+      --accent-green: #3fb950;
+      --accent-yellow: #d29922;
+      --font-mono: 'Consolas', 'Fira Code', 'Courier New', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 16px 20px;
+      line-height: 1.5;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .dual-dot {
+      display: flex;
+      gap: 5px;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-a { background: var(--sensor-a-color); box-shadow: 0 0 10px var(--sensor-a-color); }
+    .dot-b { background: var(--sensor-b-color); box-shadow: 0 0 10px var(--sensor-b-color); }
+
+    h1 { font-size: 1.25rem; font-weight: 600; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    select, input, button {
+      background: #21262d;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 11px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--sensor-a-color);
+      box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover:not(:disabled) { background: #30363d; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.btn-sensor-a {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.btn-sensor-a:hover:not(:disabled) { background: #388bfd; }
+
+    button.btn-sensor-b {
+      background: #bd561d;
+      border-color: #f0883e;
+      color: #fff;
+    }
+    button.btn-sensor-b:hover:not(:disabled) { background: #d66424; }
+
+    button.btn-primary {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+    button.btn-primary:hover:not(:disabled) { background: #2ea043; }
+
+    button.btn-wake {
+      background: #6e1c25;
+      border-color: var(--accent-laser);
+      color: #fff;
+      font-weight: 700;
+    }
+    button.btn-wake:hover:not(:disabled) {
+      background: #8b2530;
+      box-shadow: 0 0 10px rgba(255, 51, 68, 0.5);
+    }
+
+    .status-badge {
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .status-disconnected {
+      background: rgba(248, 81, 73, 0.15);
+      color: #f85149;
+      border: 1px solid rgba(248, 81, 73, 0.4);
+    }
+    .status-connected {
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
+    }
+
+    /* CARD PRINCIPAL DO VELOCÍMETRO */
+    .speed-radar-card {
+      background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+      border: 2px solid #30363d;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1.3fr;
+      gap: 20px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    @media (max-width: 992px) {
+      .speed-radar-card {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+    }
+
+    .speed-radar-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--sensor-a-color), #fff, var(--sensor-b-color));
+    }
+
+    .speed-main-display {
+      display: flex;
+      flex-direction: column;
+    }
+    .speed-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .speed-val-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .speed-num {
+      font-family: var(--font-mono);
+      font-size: 4.5rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+      text-shadow: 0 0 25px rgba(88, 166, 255, 0.35);
+    }
+    .speed-unit {
+      font-size: 1.6rem;
+      color: var(--sensor-a-color);
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .speed-secondary {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .speed-stats-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stat-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+    .stat-bold {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .direction-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--sensor-a-color);
+      border: 1px solid rgba(88, 166, 255, 0.4);
+    }
+
+    /* CONFIGURAÇÃO DA DISTÂNCIA SEM LIMITE MÍNIMO */
+    .trap-config-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .trap-config-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--accent-yellow);
+      margin-bottom: 10px;
+    }
+    .config-field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+      gap: 10px;
+    }
+    .config-field-row input {
+      width: 100px;
+      text-align: right;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    /* CARDS DOS DOIS SENSORES */
+    .dual-sensor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 768px) {
+      .dual-sensor-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card.card-sensor-a { border-top: 3px solid var(--sensor-a-color); }
+    .card.card-sensor-b { border-top: 3px solid var(--sensor-b-color); }
+
+    .card-title {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .mini-dist-display {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+    }
+    .mini-num {
+      font-family: var(--font-mono);
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .beam-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .beam-clear {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(63, 185, 80, 0.4);
+    }
+    .beam-blocked {
+      background: rgba(255, 51, 68, 0.2);
+      color: var(--accent-laser);
+      border: 1px solid rgba(255, 51, 68, 0.5);
+      animation: pulse 0.5s infinite alternate;
+    }
+
+    .sensor-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+    .sensor-row input {
+      width: 90px;
+      text-align: right;
+    }
+
+    /* Gráfico */
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 230px;
+      background: #0d1117;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    canvas#dualChart {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Tabela de Histórico */
+    .history-wrapper {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+    table.data-table th {
+      background: #161b22;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 8px 12px;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid #30363d;
+    }
+    table.data-table td {
+      padding: 6px 12px;
+      border-bottom: 1px solid #21262d;
+    }
+    table.data-table tr:hover { background: #1c2128; }
+
+    /* Terminal de Diagnóstico */
+    .term-box {
+      background: #090d13;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      height: 150px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .term-row {
+      display: flex;
+      gap: 8px;
+      word-break: break-all;
+    }
+    .term-time { color: var(--text-muted); min-width: 75px; }
+    .term-a { color: var(--sensor-a-color); }
+    .term-b { color: var(--sensor-b-color); }
+    .term-info { color: #8b949e; }
+    .term-alarm { color: #ff5566; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="dual-dot">
+        <div class="dot dot-a"></div>
+        <div class="dot dot-b"></div>
+      </div>
+      <div>
+        <h1>Velocímetro Laser de Barreira Dupla</h1>
+        <div style="font-size: 0.72rem; color: var(--text-muted);">
+          2x Sensores Laser Meskernel PTFH &bull; v = Δs / Δt &bull; Sem Distância Mínima &bull; Despertar Automático
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <!-- Modo Simulação -->
+      <button id="btnSimulate" style="background: #21262d;">
+        Modo Simulação
+      </button>
+
+      <div id="simPassButtons" style="display: none; gap: 6px;">
+        <button id="btnSimPassSlow" style="border-color: var(--sensor-a-color);">⚡ 20 km/h</button>
+        <button id="btnSimPassMed" style="border-color: var(--accent-green);">⚡ 50 km/h</button>
+        <button id="btnSimPassFast" style="border-color: var(--accent-laser);">⚡ 90 km/h</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- PAINEL PRINCIPAL DE CONEXÃO: ARDUINO DUE (HARDWARE TIMING 84 MHz) -->
+  <div style="background: linear-gradient(135deg, #161b22, #0d1a2d); border: 2px solid #388bfd; border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(56, 139, 253, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.6rem;">⚡</span>
+        <div>
+          <div style="font-weight: 800; font-size: 1.05rem; color: #58a6ff; display: flex; align-items: center; gap: 8px;">
+            Arduino Due &bull; Alta Precisão Hardware (84 MHz / Microssegundos)
+            <span style="background: rgba(56, 139, 253, 0.2); border: 1px solid #388bfd; color: #58a6ff; font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; font-weight: 700;">RECOMENDADO</span>
+          </div>
+          <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">
+            Conecte o cabo USB na <strong>Porta de Programação</strong> do Arduino Due. O microcontrolador lê os 2 sensores no mesmo chip com precisão de microssegundos (µs) e simetria perfeita!
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button id="btnConnectDue" style="background: #238636; border-color: #2ea043; color: #fff; font-weight: 700; padding: 8px 18px; font-size: 0.9rem; box-shadow: 0 0 12px rgba(35, 134, 54, 0.4);">
+          🔌 Conectar Arduino Due
+        </button>
+        <span id="badgeDue" class="status-badge status-disconnected">Due: Desconectado</span>
+      </div>
+    </div>
+
+    <!-- Comandos rápidos para o Arduino Due -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid rgba(48, 54, 61, 0.6); padding-top: 10px; font-size: 0.78rem;">
+      <span style="color: var(--text-muted); font-weight: 600;">Comandos Rápidos no Due:</span>
+      <button id="btnDueCaptureBg" style="padding: 4px 10px; font-size: 0.76rem; border-color: #388bfd;" title="Envia comando 'b' para o Due calibrar as paredes de fundo A e B">
+        🎯 Capturar Fundos no Due ('b')
+      </button>
+      <button id="btnDueWake" style="padding: 4px 10px; font-size: 0.76rem; border-color: #e3b341;" title="Envia comando 'w' para o Due acordar os dois sensores laser">
+        🚀 Acordar Sensores ('w')
+      </button>
+      <button id="btnDueSyncDist" style="padding: 4px 10px; font-size: 0.76rem; border-color: #3fb950;" title="Envia comando 'd' com a distância Δs atual para a memória do Due">
+        📏 Enviar Δs para o Due ('d')
+      </button>
+      <button id="btnDueZero" style="padding: 4px 10px; font-size: 0.76rem; border-color: #ff7b72;" title="Envia comando 'z' para zerar o contador interno do Due">
+        🔄 Zerar Contador ('z')
+      </button>
+      <button id="btnToggleLegacy" style="margin-left: auto; padding: 4px 10px; font-size: 0.72rem; background: transparent; border-color: #30363d; color: var(--text-muted);">
+        ⚙️ Modo Direto PC (2 Portas USB CH340)
+      </button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR LEGADA: SENSORES DIRETOS NO PC (2 PORTAS USB) -->
+  <div id="legacyToolbar" style="display: none; background: #161b22; border: 1px dashed #30363d; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; align-items: center;">
+    <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); width: 100%; margin-bottom: 4px;">
+      Modo Legado: 2 Cabos USB Conectados Diretamente no PC (Sensor A + Sensor B)
+    </span>
+    <!-- Sensor A -->
+    <label for="baudA" style="font-size: 0.75rem; color: var(--sensor-a-color);">Baud A:</label>
+    <select id="baudA" style="font-size: 0.8rem; padding: 4px 6px;">
+      <option value="115200" selected>115200</option>
+      <option value="19200">19200</option>
+      <option value="9600">9600</option>
+      <option value="38400">38400</option>
+    </select>
+    <button id="btnConnectA" class="btn-sensor-a">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      Conectar Sensor A
+    </button>
+    <span id="badgeA" class="status-badge status-disconnected">A: Off</span>
+
+    <!-- Sensor B -->
+    <label for="baudB" style="font-size: 0.75rem; color: var(--sensor-b-color); margin-left: 6px;">Baud B:</label>
+    <select id="baudB" style="font-size: 0.8rem; padding: 4px 6px;">
+      <option value="115200" selected>115200</option>
+      <option value="19200">19200</option>
+      <option value="9600">9600</option>
+      <option value="38400">38400</option>
+    </select>
+    <button id="btnConnectB" class="btn-sensor-b">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      Conectar Sensor B
+    </button>
+    <span id="badgeB" class="status-badge status-disconnected">B: Off</span>
+
+    <!-- BOTÃO GIGANTE DE ACORDAR AMBOS OS SENSORES -->
+    <button id="btnWakeSensors" class="btn-wake" title="Envia rajada de comandos (Broadcast, Addr 0, Addr 1, ASCII) para ligar os sensores imediatamente">
+      🚀 ACORDAR SENSORES AGORA
+    </button>
+
+    <!-- BOTÃO DE TURBINAR FREQUÊNCIA -->
+    <button id="btnBoostFreq" style="background: #238636; border-color: #2ea043; color: #fff; font-weight: 600;" title="Configura os sensores para modo de alta frequência (100Hz / 200Hz) para resposta ultra rápida">
+      ⚡ TURBINAR TAXA (100Hz/200Hz)
+    </button>
+  </div>
+
+  <!-- BARRA DE DIAGNÓSTICO E TELEMETRIA EM TEMPO REAL -->
+  <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 0.82rem;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-weight: 700; color: #58a6ff;">📡 Telemetria do Servidor:</span>
+      <span id="telemetryStatus" style="color: #3fb950; font-weight: 600;">🟢 Ativa (Monitorando leituras)</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: var(--text-muted);">Alinhamento dos Feixes:</span>
+      <span id="alignmentStatus" style="font-weight: 600; color: #8b949e;">Aguardando fundos capturados</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: var(--text-muted);">Latência Teórica de Amostragem:</span>
+      <span id="sampleLatencyEst" style="font-family: var(--font-mono); font-weight: 700; color: #fff;">-- ms</span>
+    </div>
+  </div>
+
+  <!-- RADAR / BANNER PRINCIPAL DE VELOCIDADE -->
+  <div class="speed-radar-card">
+    <div class="speed-main-display">
+      <span class="speed-label">Velocidade Medida</span>
+      <div class="speed-val-row">
+        <span id="speedNum" class="speed-num">---</span>
+        <span class="speed-unit">km/h</span>
+      </div>
+      <div class="speed-secondary">
+        <span id="speedMs">---</span> m/s
+      </div>
+    </div>
+
+    <div class="speed-stats-box">
+      <div class="stat-line">
+        <span style="color: var(--text-muted);">Tempo de Trânsito (Δt):</span>
+        <span id="deltaTDisplay" class="stat-bold">--- ms</span>
+      </div>
+      <div class="stat-line">
+        <span style="color: var(--text-muted);">Sentido:</span>
+        <span id="directionBadge" class="direction-badge">Aguardando passagem</span>
+      </div>
+      <div class="stat-line">
+        <span style="color: var(--text-muted);">Total de Passagens:</span>
+        <span id="totalPassCount" class="stat-bold" style="color: var(--accent-green);">0</span>
+      </div>
+      <div class="stat-line">
+        <span style="color: var(--text-muted);">Som de Alarme:</span>
+        <label style="cursor: pointer;"><input type="checkbox" id="chkAudio" checked> Ativar Bip</label>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÃO DA DISTÂNCIA SEM LIMITE MÍNIMO -->
+    <div class="trap-config-box">
+      <div class="trap-config-title">Configuração da Armadilha Óptica</div>
+
+      <div class="config-field-row">
+        <label for="trapDistanceInput" title="Distância física medida entre o Feixe A e o Feixe B (sem valor mínimo)">
+          <strong>Distância entre Sensores (Δs):</strong>
+        </label>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <!-- SEM LIMITE MÍNIMO -->
+          <input type="number" id="trapDistanceInput" step="0.01" min="0.001" value="0.50">
+          <span style="color: var(--text-muted);">m</span>
+        </div>
+      </div>
+
+      <div class="config-field-row">
+        <label for="maxSpeedInput">Limite para Alerta:</label>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="number" id="maxSpeedInput" step="5" min="1" value="60">
+          <span style="color: var(--text-muted);">km/h</span>
+        </div>
+      </div>
+
+      <div class="config-field-row">
+        <label for="timeoutInput">Timeout de Passagem:</label>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="number" id="timeoutInput" step="0.5" min="0.5" value="5.0">
+          <span style="color: var(--text-muted);">s</span>
+        </div>
+      </div>
+
+      <div class="config-field-row">
+        <label for="filterSamplesInput" title="Número de amostras consecutivas para confirmar corte real (elimina ruído sem perder o instante de entrada)">
+          <strong>Filtro Anti-Falso Disparo:</strong>
+        </label>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="number" id="filterSamplesInput" min="1" max="15" value="3">
+          <span style="color: var(--text-muted); font-size: 0.75rem;">amostras (~6ms)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARDS INDIVIDUAIS DOS DOIS SENSORES -->
+  <div class="dual-sensor-grid">
+    <!-- SENSOR A (Feixe 1) -->
+    <div class="card card-sensor-a">
+      <div class="card-title">
+        <span style="color: var(--sensor-a-color); font-weight: 700;">Sensor A (Feixe 1)</span>
+        <span id="rateA" style="font-size: 0.75rem; color: var(--text-muted);">0 Hz</span>
+      </div>
+
+      <div class="mini-dist-display">
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">DISTÂNCIA A</div>
+          <span id="distValA" class="mini-num">---</span> <span style="font-family: var(--font-mono); color: var(--text-muted);">m</span>
+        </div>
+        <span id="beamBadgeA" class="beam-pill beam-clear">✓ FEIXE LIVRE</span>
+      </div>
+
+      <!-- Caixa de Diagnóstico do Sensor A -->
+      <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Status Serial:</span>
+          <span id="commStatusA" style="font-weight: bold; color: #8b949e;">Desconectado</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: var(--text-muted);">Último Pacote HEX:</span>
+          <span id="lastHexA" style="font-family: var(--font-mono); color: var(--sensor-a-color);">--</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btnWakeA" class="btn-wake" style="padding: 2px 8px; font-size: 0.72rem;">
+            🚀 Acordar Sensor A
+          </button>
+          <button id="btnLaserA" style="padding: 2px 8px; font-size: 0.72rem;">
+            🔴 Ligar Laser (O)
+          </button>
+        </div>
+      </div>
+
+      <div class="sensor-row">
+        <label>Distância de Fundo A (Parede):</label>
+        <input type="number" id="bgAInput" step="0.05" value="4.00">
+      </div>
+      <div class="sensor-row">
+        <label>Tolerância de Fundo A:</label>
+        <input type="number" id="tolAInput" step="0.05" value="0.50">
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+        Aciona quando qualquer objeto passar a menos de: <strong id="cutoffATxt" style="color: var(--sensor-a-color);">3.80 m</strong>
+      </div>
+      <button id="btnCaptureBgA" class="btn-sensor-a" style="width: 100%; justify-content: center; font-size: 0.82rem;">
+        🎯 Capturar Fundo A Atual
+      </button>
+    </div>
+
+    <!-- SENSOR B (Feixe 2) -->
+    <div class="card card-sensor-b">
+      <div class="card-title">
+        <span style="color: var(--sensor-b-color); font-weight: 700;">Sensor B (Feixe 2)</span>
+        <span id="rateB" style="font-size: 0.75rem; color: var(--text-muted);">0 Hz</span>
+      </div>
+
+      <div class="mini-dist-display">
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">DISTÂNCIA B</div>
+          <span id="distValB" class="mini-num">---</span> <span style="font-family: var(--font-mono); color: var(--text-muted);">m</span>
+        </div>
+        <span id="beamBadgeB" class="beam-pill beam-clear">✓ FEIXE LIVRE</span>
+      </div>
+
+      <!-- Caixa de Diagnóstico do Sensor B -->
+      <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Status Serial:</span>
+          <span id="commStatusB" style="font-weight: bold; color: #8b949e;">Desconectado</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: var(--text-muted);">Último Pacote HEX:</span>
+          <span id="lastHexB" style="font-family: var(--font-mono); color: var(--sensor-b-color);">--</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btnWakeB" class="btn-wake" style="padding: 2px 8px; font-size: 0.72rem;">
+            🚀 Acordar Sensor B
+          </button>
+          <button id="btnLaserB" style="padding: 2px 8px; font-size: 0.72rem;">
+            🔴 Ligar Laser (O)
+          </button>
+        </div>
+      </div>
+
+      <div class="sensor-row">
+        <label>Distância de Fundo B (Parede):</label>
+        <input type="number" id="bgBInput" step="0.05" value="4.00">
+      </div>
+      <div class="sensor-row">
+        <label>Tolerância de Fundo B:</label>
+        <input type="number" id="tolBInput" step="0.05" value="0.50">
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+        Aciona quando qualquer objeto passar a menos de: <strong id="cutoffBTxt" style="color: var(--sensor-b-color);">3.80 m</strong>
+      </div>
+      <button id="btnCaptureBgB" class="btn-sensor-b" style="width: 100%; justify-content: center; font-size: 0.82rem;">
+        🎯 Capturar Fundo B Atual
+      </button>
+    </div>
+  </div>
+
+  <!-- GRÁFICO DUPLO SIMULTÂNEO -->
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="card-title">
+      <span>Gráfico Simultâneo em Tempo Real</span>
+      <div style="display: flex; gap: 14px; font-size: 0.75rem;">
+        <span style="color: var(--sensor-a-color); font-weight: 700;">● Sensor A</span>
+        <span style="color: var(--sensor-b-color); font-weight: 700;">● Sensor B</span>
+      </div>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="dualChart"></canvas>
+    </div>
+  </div>
+
+  <!-- TABELA DE HISTÓRICO DE VELOCIDADES & CALIBRAÇÃO REAL -->
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="card-title">
+      <span>Histórico de Passagens e Calibração Real do Carro</span>
+      <div style="display: flex; gap: 8px;">
+        <button id="btnClearHistory" style="padding: 2px 8px; font-size: 0.75rem;">Limpar</button>
+        <button id="btnExportCsv" class="btn-primary" style="padding: 2px 8px; font-size: 0.75rem;">Exportar CSV</button>
+      </div>
+    </div>
+
+    <!-- BANNER DO ASSISTENTE DE CALIBRAÇÃO INTELIGENTE -->
+    <div id="calibrationBanner" style="display: none; background: #0d1117; border: 1px solid #388bfd; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.8rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div style="flex: 1; min-width: 250px;">
+        <span style="color: #58a6ff; font-weight: 700;">🎯 Assistente de Calibração:</span>
+        <span id="calibStatsText" style="color: #f0f6fc; margin-left: 6px;">Digite a velocidade real do carro na tabela para ver a sugestão de ajuste...</span>
+      </div>
+      <button id="btnApplyCalib" style="background: #238636; border-color: #2ea043; color: #fff; font-size: 0.75rem; padding: 5px 12px; font-weight: 700; border-radius: 6px;">
+        🎯 Aplicar Ajuste Calibrado em Δs
+      </button>
+    </div>
+
+    <div class="history-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th style="width: 105px;">Horário</th>
+            <th style="width: 110px;">Vel. Medida</th>
+            <th style="width: 145px; background: rgba(56, 139, 253, 0.15); color: #58a6ff;">🚗 Vel. Real (Carro)</th>
+            <th style="width: 145px; background: rgba(56, 139, 253, 0.08);">Diferença / Ajuste</th>
+            <th style="width: 75px;">m/s</th>
+            <th style="width: 95px;">Tempo (Δt)</th>
+            <th style="width: 85px;">Δs</th>
+            <th style="width: 110px;">Sentido</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr>
+            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 18px;">
+              Nenhuma passagem registrada ainda. Conecte os dois sensores e passe o carro pelos feixes.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TERMINAL DE MONITORAMENTO SERIAL (DIAGNÓSTICO EM TEMPO REAL) -->
+  <div class="card">
+    <div class="card-title">
+      <span>Monitor Serial Bruto (Diagnóstico)</span>
+      <div style="display: flex; gap: 10px; font-size: 0.75rem;">
+        <span id="byteCounterA" style="color: var(--sensor-a-color);">Sensor A: 0 bytes</span>
+        <span id="byteCounterB" style="color: var(--sensor-b-color);">Sensor B: 0 bytes</span>
+        <button id="btnClearTerm" style="padding: 1px 6px; font-size: 0.72rem;">Limpar Terminal</button>
+      </div>
+    </div>
+    <div id="termBox" class="term-box">
+      <div class="term-row">
+        <span class="term-time">--:--:--</span>
+        <span class="term-info">[INFO] Pronto. Conecte os sensores à porta COM ou inicie a simulação.</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- ESTADO GLOBAL DOS DOIS SENSORES ---
+    let portA = null, readerA = null, keepReadingA = false;
+    let portB = null, readerB = null, keepReadingB = false;
+    let rxBufferA = new Uint8Array(0);
+    let rxBufferB = new Uint8Array(0);
+    let totalBytesA = 0, totalBytesB = 0;
+
+    let distA = null, distB = null;
+    let isBlockedA = false, isBlockedB = false;
+
+    // Cronômetro do Velocímetro
+    let trapState = 'IDLE'; // 'IDLE', 'WAIT_B', 'WAIT_A'
+    let tTriggerA = 0, tTriggerB = 0;
+    let passCount = 0;
+    let speedHistory = [];
+
+    // Frequência Hz e Latência Teórica
+    let rateCountA = 0, rateCountB = 0;
+    setInterval(() => {
+      document.getElementById('rateA').innerText = `${rateCountA} Hz`;
+      document.getElementById('rateB').innerText = `${rateCountB} Hz`;
+
+      const maxHz = Math.max(rateCountA, rateCountB);
+      const latEl = document.getElementById('sampleLatencyEst');
+      if (latEl) {
+        if (maxHz > 0) {
+          const lat = (1000 / maxHz).toFixed(1);
+          latEl.innerText = `±${lat} ms (em ${maxHz} Hz)`;
+          latEl.style.color = maxHz >= 50 ? '#3fb950' : (maxHz >= 20 ? '#d29922' : '#ff3344');
+        } else {
+          latEl.innerText = '-- ms';
+          latEl.style.color = '#fff';
+        }
+      }
+
+      if (rateCountA > 0 || rateCountB > 0) {
+        sendTelemetry('RATES', { rateA: rateCountA, rateB: rateCountB, distA, distB });
+      }
+
+      rateCountA = 0; rateCountB = 0;
+    }, 1000);
+
+    let chartHistoryA = [], chartHistoryB = [];
+
+    // Web Audio API
+    let audioCtx = null;
+    function playBeep(freq = 880, dur = 0.12) {
+      if (!document.getElementById('chkAudio').checked) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch (e) {}
+    }
+
+    // Elementos DOM
+    // --- ESTADO E ELEMENTOS DO ARDUINO DUE (HARDWARE TIMING) ---
+    const btnConnectDue = document.getElementById('btnConnectDue');
+    const badgeDue = document.getElementById('badgeDue');
+    const btnDueCaptureBg = document.getElementById('btnDueCaptureBg');
+    const btnDueWake = document.getElementById('btnDueWake');
+    const btnDueSyncDist = document.getElementById('btnDueSyncDist');
+    const btnDueZero = document.getElementById('btnDueZero');
+    const btnToggleLegacy = document.getElementById('btnToggleLegacy');
+    const legacyToolbar = document.getElementById('legacyToolbar');
+
+    let portDue = null, readerDue = null, writerDue = null, keepReadingDue = false;
+
+    if (btnToggleLegacy && legacyToolbar) {
+      btnToggleLegacy.addEventListener('click', () => {
+        legacyToolbar.style.display = (legacyToolbar.style.display === 'none') ? 'flex' : 'none';
+      });
+    }
+
+    function updateDueBadge(connected) {
+      if (connected) {
+        badgeDue.className = 'status-badge status-connected';
+        badgeDue.innerText = '🟢 Due Conectado (115200 bps)';
+        btnConnectDue.style.background = '#da3633';
+        btnConnectDue.style.borderColor = '#f85149';
+        btnConnectDue.innerText = '🔌 Desconectar Due';
+        commStatusA.innerText = '🟢 Via Arduino Due';
+        commStatusA.style.color = '#3fb950';
+        commStatusB.innerText = '🟢 Via Arduino Due';
+        commStatusB.style.color = '#3fb950';
+      } else {
+        badgeDue.className = 'status-badge status-disconnected';
+        badgeDue.innerText = 'Due: Desconectado';
+        btnConnectDue.style.background = '#238636';
+        btnConnectDue.style.borderColor = '#2ea043';
+        btnConnectDue.innerText = '🔌 Conectar Arduino Due';
+      }
+    }
+
+    async function sendDueCommand(cmdStr) {
+      if (!writerDue) {
+        logTerm('DUE', 'Arduino Due não está conectado.');
+        return;
+      }
+      try {
+        await writerDue.write(cmdStr.trim() + '\n');
+        logTerm('CMD', `Enviado ao Arduino Due: "${cmdStr.trim()}"`);
+      } catch (e) {
+        logTerm('ERRO', 'Erro ao enviar comando ao Due: ' + e.message);
+      }
+    }
+
+    async function connectDue() {
+      if (portDue) {
+        await disconnectDue();
+        return;
+      }
+      if (!('serial' in navigator)) {
+        alert('Web Serial API não suportada neste navegador. Use o Google Chrome ou Microsoft Edge.');
+        return;
+      }
+
+      try {
+        portDue = await navigator.serial.requestPort();
+        await portDue.open({ baudRate: 115200 });
+        keepReadingDue = true;
+        updateDueBadge(true);
+        logTerm('DUE', 'Conectado com sucesso à Porta de Programação do Arduino Due (115200 bps).');
+
+        const textEncoder = new TextEncoderStream();
+        textEncoder.readable.pipeTo(portDue.writable).catch(() => {});
+        writerDue = textEncoder.writable.getWriter();
+
+        setTimeout(() => {
+          const trapD = parseFloat(trapDistanceInput.value) || 0.50;
+          sendDueCommand('d' + trapD.toFixed(3));
+          const tol = parseFloat(tolAInput.value) || 0.50;
+          sendDueCommand('t' + tol.toFixed(2));
+          const filter = parseInt(filterInput ? filterInput.value : 3) || 3;
+          sendDueCommand('f' + filter);
+        }, 600);
+
+        readDueLoop();
+      } catch (err) {
+        console.error('Erro ao conectar Arduino Due:', err);
+        logTerm('ERRO', 'Falha ao conectar ao Arduino Due: ' + err.message);
+        disconnectDue();
+      }
+    }
+
+    async function disconnectDue() {
+      keepReadingDue = false;
+      if (readerDue) {
+        try { await readerDue.cancel(); } catch(e) {}
+        try { readerDue.releaseLock(); } catch(e) {}
+        readerDue = null;
+      }
+      if (writerDue) {
+        try { await writerDue.close(); } catch(e) {}
+        writerDue = null;
+      }
+      if (portDue) {
+        try { await portDue.close(); } catch(e) {}
+        portDue = null;
+      }
+      updateDueBadge(false);
+      logTerm('DUE', 'Arduino Due desconectado.');
+    }
+
+    async function readDueLoop() {
+      let lineBuf = '';
+      const decoder = new TextDecoder();
+      readerDue = portDue.readable.getReader();
+
+      try {
+        while (keepReadingDue) {
+          const { value, done } = await readerDue.read();
+          if (done) break;
+          if (value) {
+            lineBuf += decoder.decode(value, { stream: true });
+            const lines = lineBuf.split('\n');
+            lineBuf = lines.pop();
+            for (const line of lines) {
+              handleDueLine(line.trim());
+            }
+          }
+        }
+      } catch (err) {
+        if (keepReadingDue) {
+          logTerm('ERRO', 'Erro na leitura serial do Due: ' + err.message);
+        }
+      } finally {
+        if (readerDue) {
+          try { readerDue.releaseLock(); } catch(e) {}
+          readerDue = null;
+        }
+      }
+    }
+
+    function handleDueLine(rawLine) {
+      if (!rawLine) return;
+
+      if (!rawLine.startsWith('{"type":"TELEMETRY"')) {
+        logTerm('DUE', rawLine);
+      }
+
+      let jsonStr = null;
+      if (rawLine.startsWith('{') && rawLine.endsWith('}')) {
+        jsonStr = rawLine;
+      } else {
+        const match = rawLine.match(/(\{.*\})/);
+        if (match) jsonStr = match[1];
+      }
+
+      if (jsonStr) {
+        try {
+          const payload = JSON.parse(jsonStr);
+          handleDuePayload(payload);
+        } catch(e) {}
+      }
+    }
+
+    function handleDuePayload(data) {
+      if (!data || !data.type) return;
+
+      if (data.type === 'TELEMETRY') {
+        if (typeof data.distA === 'number') {
+          distA = data.distA;
+          distValA.innerText = data.distA.toFixed(2);
+          chartHistoryA.push(data.distA);
+          if (chartHistoryA.length > 80) chartHistoryA.shift();
+        }
+        if (typeof data.distB === 'number') {
+          distB = data.distB;
+          distValB.innerText = data.distB.toFixed(2);
+          chartHistoryB.push(data.distB);
+          if (chartHistoryB.length > 80) chartHistoryB.shift();
+        }
+
+        if (typeof data.blockedA === 'boolean') {
+          isBlockedA = data.blockedA;
+          beamBadgeA.className = data.blockedA ? 'beam-pill beam-blocked' : 'beam-pill beam-clear';
+          beamBadgeA.innerText = data.blockedA ? '🚨 FEIXE CORTADO' : '✓ FEIXE LIVRE';
+        }
+        if (typeof data.blockedB === 'boolean') {
+          isBlockedB = data.blockedB;
+          beamBadgeB.className = data.blockedB ? 'beam-pill beam-blocked' : 'beam-pill beam-clear';
+          beamBadgeB.innerText = data.blockedB ? '🚨 FEIXE CORTADO' : '✓ FEIXE LIVRE';
+        }
+
+        if (typeof data.rateA === 'number') document.getElementById('rateA').innerText = `${data.rateA} Hz`;
+        if (typeof data.rateB === 'number') document.getElementById('rateB').innerText = `${data.rateB} Hz`;
+
+        if (data.trapState === 'IDLE') {
+          if (directionBadge.innerText.startsWith('⚡')) directionBadge.innerText = 'Aguardando passagem';
+        } else if (data.trapState === 'WAIT_B') {
+          directionBadge.innerText = '⚡ Feixe A Cortado! Aguardando Feixe B...';
+        } else if (data.trapState === 'WAIT_A') {
+          directionBadge.innerText = '⚡ Feixe B Cortado! Aguardando Feixe A...';
+        }
+
+        drawDualChart();
+        checkAlignment();
+      }
+      else if (data.type === 'TRIGGER') {
+        playBeep(750, 0.04);
+        if (data.sensor === 'A') {
+          directionBadge.innerText = '⚡ Feixe A Cortado! Cronometrando no Due...';
+        } else {
+          directionBadge.innerText = '⚡ Feixe B Cortado! Cronometrando no Due...';
+        }
+      }
+      else if (data.type === 'PASS') {
+        const dirStr = (data.dir === 'A->B') ? 'A ➔ B (Ida)' : 'B ➔ A (Volta)';
+        processSpeedResult({
+          id: data.id,
+          kmh: data.kmh,
+          ms: data.ms,
+          deltaMs: data.deltaMs,
+          deltaUs: data.deltaUs,
+          trapDist: data.trapDist,
+          dir: dirStr,
+          overspeed: data.overspeed,
+          estLengthM: data.estLengthM
+        });
+        sendTelemetry('PASS_DUE', data);
+      }
+      else if (data.type === 'BG_UPDATE') {
+        if (typeof data.bgA === 'number') bgAInput.value = data.bgA.toFixed(2);
+        if (typeof data.bgB === 'number') bgBInput.value = data.bgB.toFixed(2);
+        updateCutoffs();
+      }
+      else if (data.type === 'CONFIG') {
+        if (typeof data.trapDist === 'number') trapDistanceInput.value = data.trapDist.toFixed(3);
+      }
+    }
+
+    if (btnConnectDue) btnConnectDue.addEventListener('click', connectDue);
+    if (btnDueCaptureBg) btnDueCaptureBg.addEventListener('click', () => sendDueCommand('b'));
+    if (btnDueWake) btnDueWake.addEventListener('click', () => sendDueCommand('w'));
+    if (btnDueSyncDist) btnDueSyncDist.addEventListener('click', () => {
+      const d = parseFloat(trapDistanceInput.value) || 0.50;
+      sendDueCommand('d' + d.toFixed(3));
+      alert(`Distância Δs = ${d.toFixed(3)}m sincronizada com o Arduino Due!`);
+    });
+    if (btnDueZero) btnDueZero.addEventListener('click', () => sendDueCommand('z'));
+
+    // --- ELEMENTOS MODO LEGADO DIRETO NO PC ---
+    const btnConnectA = document.getElementById('btnConnectA');
+    const btnConnectB = document.getElementById('btnConnectB');
+    const badgeA = document.getElementById('badgeA');
+    const badgeB = document.getElementById('badgeB');
+    const baudA = document.getElementById('baudA');
+    const baudB = document.getElementById('baudB');
+
+    const btnWakeSensors = document.getElementById('btnWakeSensors');
+    const btnWakeA = document.getElementById('btnWakeA');
+    const btnWakeB = document.getElementById('btnWakeB');
+    const btnLaserA = document.getElementById('btnLaserA');
+    const btnLaserB = document.getElementById('btnLaserB');
+
+    const commStatusA = document.getElementById('commStatusA');
+    const commStatusB = document.getElementById('commStatusB');
+    const lastHexA = document.getElementById('lastHexA');
+    const lastHexB = document.getElementById('lastHexB');
+
+    const btnSimulate = document.getElementById('btnSimulate');
+    const simPassButtons = document.getElementById('simPassButtons');
+
+    const speedNum = document.getElementById('speedNum');
+    const speedMs = document.getElementById('speedMs');
+    const deltaTDisplay = document.getElementById('deltaTDisplay');
+    const directionBadge = document.getElementById('directionBadge');
+    const totalPassCount = document.getElementById('totalPassCount');
+
+    const trapDistanceInput = document.getElementById('trapDistanceInput');
+    const maxSpeedInput = document.getElementById('maxSpeedInput');
+    const timeoutInput = document.getElementById('timeoutInput');
+    const filterInput = document.getElementById('filterSamplesInput');
+
+    const distValA = document.getElementById('distValA');
+    const distValB = document.getElementById('distValB');
+    const beamBadgeA = document.getElementById('beamBadgeA');
+    const beamBadgeB = document.getElementById('beamBadgeB');
+    const bgAInput = document.getElementById('bgAInput');
+    const bgBInput = document.getElementById('bgBInput');
+    const tolAInput = document.getElementById('tolAInput');
+    const tolBInput = document.getElementById('tolBInput');
+    const cutoffATxt = document.getElementById('cutoffATxt');
+    const cutoffBTxt = document.getElementById('cutoffBTxt');
+    const btnCaptureBgA = document.getElementById('btnCaptureBgA');
+    const btnCaptureBgB = document.getElementById('btnCaptureBgB');
+
+    const historyBody = document.getElementById('historyBody');
+    const btnClearHistory = document.getElementById('btnClearHistory');
+    const btnExportCsv = document.getElementById('btnExportCsv');
+
+    const termBox = document.getElementById('termBox');
+    const byteCounterA = document.getElementById('byteCounterA');
+    const byteCounterB = document.getElementById('byteCounterB');
+    const btnClearTerm = document.getElementById('btnClearTerm');
+
+    const canvas = document.getElementById('dualChart');
+    const ctx = canvas.getContext('2d');
+
+    // Comandos PTFH Oficiais
+    const CMD_PTFH_CONT_FF = new Uint8Array([0xFA, 0x01, 0xFF, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0xFF]);
+    const CMD_PTFH_CONT_00 = new Uint8Array([0xFA, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    const CMD_PTFH_CONT_01 = new Uint8Array([0xFA, 0x01, 0x01, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01]);
+    const CMD_ASCII_O      = new TextEncoder().encode("O\r\n");
+    const CMD_ASCII_C      = new TextEncoder().encode("C\r\n");
+    const CMD_ASCII_D      = new TextEncoder().encode("D\r\n");
+
+    // Comandos de Frequência Meskernel (Taxa Ultra Rápida)
+    const CMD_FREQ_100HZ   = new Uint8Array([0xFA, 0x04, 0x0A, 0x64, 0x94]); // 100 Hz
+    const CMD_FREQ_200HZ   = new Uint8Array([0xFA, 0x04, 0x0A, 0xC8, 0x30]); // 200 Hz
+    const CMD_FREQ_20HZ    = new Uint8Array([0xFA, 0x04, 0x0A, 0x14, 0xE4]); // 20 Hz
+
+    // Envio de Telemetria ao Servidor Node em Tempo Real
+    function sendTelemetry(type, data) {
+      try {
+        fetch('/api/telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, data, clientTime: performance.now() })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    function checkAlignment() {
+      const bgA = parseFloat(bgAInput.value);
+      const bgB = parseFloat(bgBInput.value);
+      const el = document.getElementById('alignmentStatus');
+      if (!el) return;
+      if (isNaN(bgA) || isNaN(bgB) || distA === null || distB === null) {
+        el.style.color = '#8b949e';
+        el.innerText = 'Aguardando fundos capturados';
+        return;
+      }
+      const diff = Math.abs(bgA - bgB);
+      if (diff < 0.08) {
+        el.style.color = '#3fb950';
+        el.innerText = `✓ Feixes Paralelos (Dif: ${(diff * 100).toFixed(0)}cm)`;
+      } else if (diff < 0.25) {
+        el.style.color = '#d29922';
+        el.innerText = `🟡 Ligeira Diferença de Fundo: ${(diff * 100).toFixed(0)}cm`;
+      } else {
+        el.style.color = '#ff3344';
+        el.innerText = `🚨 Feixes Não Paralelos (${(diff * 100).toFixed(0)}cm de desvio!)`;
+      }
+    }
+
+    function logTerm(source, msg, isAlarm = false) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      const row = document.createElement('div');
+      row.className = 'term-row';
+
+      let cls = 'term-info';
+      if (source === 'A') cls = 'term-a';
+      else if (source === 'B') cls = 'term-b';
+      else if (isAlarm) cls = 'term-alarm';
+
+      row.innerHTML = `<span class="term-time">${timeStr}</span><span class="${cls}">[${source}] ${msg}</span>`;
+      termBox.appendChild(row);
+
+      while (termBox.children.length > 200) termBox.removeChild(termBox.firstChild);
+      termBox.scrollTop = termBox.scrollHeight;
+    }
+    btnClearTerm.addEventListener('click', () => { termBox.innerHTML = ''; });
+
+    // ================================================================
+    // RAJADA DE COMANDOS PARA ACORDAR O SENSOR E TURBINAR TAXA
+    // ================================================================
+    async function wakeSensorPort(portObj, sensorTag) {
+      if (!portObj || !portObj.writable) {
+        logTerm(sensorTag, `Sensor ${sensorTag} não está conectado na porta COM!`);
+        return;
+      }
+      try {
+        logTerm(sensorTag, `⚡ Enviando sequência de acordar + turbinar 100Hz para Sensor ${sensorTag}...`);
+        const w = portObj.writable.getWriter();
+        // 1. Liga o laser (ASCII 'O')
+        await w.write(CMD_ASCII_O);
+        await new Promise(r => setTimeout(r, 40));
+        // 2. Turbinar taxa para alta velocidade (100Hz / 200Hz)
+        await w.write(CMD_FREQ_100HZ);
+        await new Promise(r => setTimeout(r, 40));
+        await w.write(CMD_FREQ_200HZ);
+        await new Promise(r => setTimeout(r, 40));
+        // 3. Modo Contínuo Broadcast (0xFF)
+        await w.write(CMD_PTFH_CONT_FF);
+        await new Promise(r => setTimeout(r, 40));
+        // 4. Modo Contínuo Endereço 0x00
+        await w.write(CMD_PTFH_CONT_00);
+        await new Promise(r => setTimeout(r, 40));
+        // 5. Modo Contínuo Endereço 0x01
+        await w.write(CMD_PTFH_CONT_01);
+        await new Promise(r => setTimeout(r, 40));
+        // 6. Modo Contínuo ASCII 'C'
+        await w.write(CMD_ASCII_C);
+        await new Promise(r => setTimeout(r, 40));
+        // 7. Ping simples ASCII 'D'
+        await w.write(CMD_ASCII_D);
+        w.releaseLock();
+        logTerm(sensorTag, `✓ Comandos enviados para Sensor ${sensorTag} (Laser ON + 100/200Hz + Streaming).`);
+      } catch (e) {
+        logTerm(sensorTag, `Erro ao acordar: ${e.message}`);
+      }
+    }
+
+    // Botão Acordar Ambos os Sensores
+    btnWakeSensors.addEventListener('click', async () => {
+      logTerm('SYS', '🚀 ACORDANDO AMBOS OS SENSORES...');
+      if (writerDue) sendDueCommand('w');
+      if (portA) await wakeSensorPort(portA, 'A');
+      if (portB) await wakeSensorPort(portB, 'B');
+    });
+
+    const btnBoostFreq = document.getElementById('btnBoostFreq');
+    if (btnBoostFreq) {
+      btnBoostFreq.addEventListener('click', async () => {
+        logTerm('SYS', '⚡ Turbinando taxa de amostragem dos sensores (100Hz/200Hz)...');
+        if (portA) await wakeSensorPort(portA, 'A');
+        if (portB) await wakeSensorPort(portB, 'B');
+      });
+    }
+
+    btnWakeA.addEventListener('click', () => wakeSensorPort(portA, 'A'));
+    btnWakeB.addEventListener('click', () => wakeSensorPort(portB, 'B'));
+
+    btnLaserA.addEventListener('click', async () => {
+      if (portA && portA.writable) {
+        const w = portA.writable.getWriter();
+        await w.write(CMD_ASCII_O);
+        w.releaseLock();
+        logTerm('A', 'Comando Laser ON (O) enviado para Sensor A.');
+      }
+    });
+
+    btnLaserB.addEventListener('click', async () => {
+      if (portB && portB.writable) {
+        const w = portB.writable.getWriter();
+        await w.write(CMD_ASCII_O);
+        w.releaseLock();
+        logTerm('B', 'Comando Laser ON (O) enviado para Sensor B.');
+      }
+    });
+
+    // Atualiza cortes
+    function updateCutoffs() {
+      const bgA = parseFloat(bgAInput.value) || 4.0;
+      const tolA = parseFloat(tolAInput.value) || 0.2;
+      cutoffATxt.innerText = `${Math.max(0.05, bgA - tolA).toFixed(2)} m`;
+
+      const bgB = parseFloat(bgBInput.value) || 4.0;
+      const tolB = parseFloat(tolBInput.value) || 0.2;
+      cutoffBTxt.innerText = `${Math.max(0.05, bgB - tolB).toFixed(2)} m`;
+
+      checkAlignment();
+    }
+    bgAInput.addEventListener('input', updateCutoffs);
+    tolAInput.addEventListener('input', updateCutoffs);
+    bgBInput.addEventListener('input', updateCutoffs);
+    tolBInput.addEventListener('input', updateCutoffs);
+    updateCutoffs();
+
+    // Capturar Fundos
+    btnCaptureBgA.addEventListener('click', () => {
+      if (writerDue) sendDueCommand('b');
+      if (distA === null || distA <= 0.05) return alert('Sensor A sem leitura válida para fundo!');
+      bgAInput.value = distA.toFixed(2);
+      updateCutoffs();
+      sendTelemetry('BG_CAPTURED', { sensor: 'A', bgDist: distA.toFixed(2), cutoff: cutoffATxt.innerText });
+      logTerm('A', `🎯 Fundo A capturado: ${distA.toFixed(2)}m. Qualquer objeto < ${cutoffATxt.innerText} dispara!`);
+    });
+
+    btnCaptureBgB.addEventListener('click', () => {
+      if (writerDue) sendDueCommand('b');
+      if (distB === null || distB <= 0.05) return alert('Sensor B sem leitura válida para fundo!');
+      bgBInput.value = distB.toFixed(2);
+      updateCutoffs();
+      sendTelemetry('BG_CAPTURED', { sensor: 'B', bgDist: distB.toFixed(2), cutoff: cutoffBTxt.innerText });
+      logTerm('B', `🎯 Fundo B capturado: ${distB.toFixed(2)}m. Qualquer objeto < ${cutoffBTxt.innerText} dispara!`);
+    });
+
+    // ================================================================
+    // CÁLCULO DE VELOCIDADE (DISPARO INSTANTÂNEO & SEM LIMITE MÍNIMO)
+    // ================================================================
+    function onFeixeDisparado(sensorName, timestamp) {
+      if (trapState === 'COOLDOWN') return; // Ignora eco residual da traseira do objeto
+
+      sendTelemetry('BEAM_TRIGGER', {
+        sensor: sensorName,
+        timestamp: parseFloat(timestamp.toFixed(2)),
+        state: trapState,
+        distA, distB
+      });
+
+      const timeoutSec = parseFloat(timeoutInput.value) || 5.0;
+      const timeoutMs = timeoutSec * 1000;
+
+      if (trapState === 'IDLE') {
+        if (sensorName === 'A') {
+          trapState = 'WAIT_B';
+          tTriggerA = timestamp;
+          directionBadge.innerText = '⚡ Feixe A Cortado! Aguardando Feixe B...';
+          playBeep(750, 0.05);
+          logTerm('A', '🚨 Objeto cortou Feixe A INSTANTANEAMENTE!');
+        } else {
+          trapState = 'WAIT_A';
+          tTriggerB = timestamp;
+          directionBadge.innerText = '⚡ Feixe B Cortado! Aguardando Feixe A...';
+          playBeep(750, 0.05);
+          logTerm('B', '🚨 Objeto cortou Feixe B INSTANTANEAMENTE!');
+        }
+      } else if (trapState === 'WAIT_B' && sensorName === 'B') {
+        const deltaMs = timestamp - tTriggerA;
+        if (deltaMs > 0 && deltaMs <= timeoutMs) {
+          calcularVelocidade(deltaMs, 'A ➔ B (Ida)');
+        }
+        trapState = 'COOLDOWN';
+        setTimeout(() => {
+          if (trapState === 'COOLDOWN') {
+            trapState = 'IDLE';
+            const cutA = (parseFloat(bgAInput.value) || 4.0) - (parseFloat(tolAInput.value) || 0.2);
+            const cutB = (parseFloat(bgBInput.value) || 4.0) - (parseFloat(tolBInput.value) || 0.2);
+            if (distA !== null && distA >= cutA) { isBlockedA = false; beamBadgeA.className = 'beam-pill beam-clear'; beamBadgeA.innerText = '✓ FEIXE LIVRE'; }
+            if (distB !== null && distB >= cutB) { isBlockedB = false; beamBadgeB.className = 'beam-pill beam-clear'; beamBadgeB.innerText = '✓ FEIXE LIVRE'; }
+          }
+        }, 350);
+      } else if (trapState === 'WAIT_A' && sensorName === 'A') {
+        const deltaMs = timestamp - tTriggerB;
+        if (deltaMs > 0 && deltaMs <= timeoutMs) {
+          calcularVelocidade(deltaMs, 'B ➔ A (Volta)');
+        }
+        trapState = 'COOLDOWN';
+        setTimeout(() => {
+          if (trapState === 'COOLDOWN') {
+            trapState = 'IDLE';
+            const cutA = (parseFloat(bgAInput.value) || 4.0) - (parseFloat(tolAInput.value) || 0.2);
+            const cutB = (parseFloat(bgBInput.value) || 4.0) - (parseFloat(tolBInput.value) || 0.2);
+            if (distA !== null && distA >= cutA) { isBlockedA = false; beamBadgeA.className = 'beam-pill beam-clear'; beamBadgeA.innerText = '✓ FEIXE LIVRE'; }
+            if (distB !== null && distB >= cutB) { isBlockedB = false; beamBadgeB.className = 'beam-pill beam-clear'; beamBadgeB.innerText = '✓ FEIXE LIVRE'; }
+          }
+        }, 350);
+      }
+    }
+
+    function processSpeedResult({ id, kmh, ms, deltaMs, deltaUs, trapDist, dir, overspeed, estLengthM }) {
+      passCount = id || (passCount + 1);
+      totalPassCount.innerText = passCount;
+
+      speedNum.innerText = kmh.toFixed(1);
+      speedMs.innerText = ms.toFixed(2);
+      deltaTDisplay.innerText = deltaUs ? `${deltaMs.toFixed(2)} ms (${deltaUs} µs)` : `${deltaMs.toFixed(1)} ms`;
+      directionBadge.innerText = dir;
+
+      if (overspeed) {
+        speedNum.style.color = '#ff3344';
+        playBeep(1200, 0.3);
+      } else {
+        speedNum.style.color = '#3fb950';
+        playBeep(980, 0.15);
+      }
+
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+
+      speedHistory.unshift({
+        id: passCount,
+        time: timeStr,
+        kmh: kmh,
+        ms: ms,
+        deltaMs: deltaMs,
+        deltaUs: deltaUs || null,
+        trapDist: trapDist,
+        dir: dir,
+        overspeed: overspeed,
+        estLengthM: estLengthM || null,
+        realKmh: null
+      });
+
+      renderHistory();
+      logTerm('SPEED', `⚡ VELOCIDADE: ${kmh.toFixed(1)} km/h (${ms.toFixed(2)} m/s) | Δt: ${deltaMs.toFixed(2)}ms ${deltaUs ? '(' + deltaUs + 'µs)' : ''} | Sentido: ${dir}`, overspeed);
+    }
+
+    function calcularVelocidade(deltaMs, directionStr) {
+      // SEM LIMITE MÍNIMO ENTRE SENSORES
+      const trapDist = parseFloat(trapDistanceInput.value) || 0.10;
+      const deltaSec = deltaMs / 1000.0;
+      const v_m_s = trapDist / deltaSec;
+      const v_km_h = v_m_s * 3.6;
+
+      const limit = parseFloat(maxSpeedInput.value) || 60;
+      const isOverspeed = v_km_h > limit;
+
+      sendTelemetry('SPEED_PASS', {
+        deltaMs: parseFloat(deltaMs.toFixed(2)),
+        v_km_h: parseFloat(v_km_h.toFixed(2)),
+        v_m_s: parseFloat(v_m_s.toFixed(2)),
+        dir: directionStr,
+        trapDist: trapDist,
+        tA: parseFloat(tTriggerA.toFixed(2)),
+        tB: parseFloat(tTriggerB.toFixed(2))
+      });
+
+      processSpeedResult({
+        id: passCount + 1,
+        kmh: v_km_h,
+        ms: v_m_s,
+        deltaMs: deltaMs,
+        trapDist: trapDist,
+        dir: directionStr,
+        overspeed: isOverspeed
+      });
+    }
+
+    // Timeout watchdog
+    setInterval(() => {
+      const toMs = (parseFloat(timeoutInput.value) || 5.0) * 1000;
+      if (trapState === 'WAIT_B' && (performance.now() - tTriggerA > toMs)) {
+        trapState = 'IDLE';
+        directionBadge.innerText = 'Timeout (Passagem Incompleta)';
+      } else if (trapState === 'WAIT_A' && (performance.now() - tTriggerB > toMs)) {
+        trapState = 'IDLE';
+        directionBadge.innerText = 'Timeout (Passagem Incompleta)';
+      }
+    }, 250);
+
+    let suggestedTrapDistGlobal = null;
+
+    function renderHistory() {
+      const banner = document.getElementById('calibrationBanner');
+      if (speedHistory.length === 0) {
+        historyBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 18px;">Nenhuma passagem registrada.</td></tr>`;
+        if (banner) banner.style.display = 'none';
+        return;
+      }
+
+      historyBody.innerHTML = speedHistory.slice(0, 50).map(r => {
+        let compHtml = '<span style="color: var(--text-muted); font-size: 0.72rem;">Digite vel. real</span>';
+        if (r.realKmh !== null && r.realKmh > 0) {
+          const diff = r.kmh - r.realKmh;
+          const errorPct = ((diff / r.realKmh) * 100);
+          const factor = r.realKmh / r.kmh;
+          const sugDist = (r.trapDist * factor).toFixed(3);
+          const isClose = Math.abs(diff) <= 1.5;
+          const col = isClose ? '#3fb950' : (diff > 0 ? '#ff7b72' : '#f0883e');
+          compHtml = `
+            <div style="font-size: 0.75rem; line-height: 1.2;">
+              <strong style="color: ${col};">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} km/h (${errorPct >= 0 ? '+' : ''}${errorPct.toFixed(0)}%)</strong>
+              <div style="color: var(--text-muted); font-size: 0.68rem; margin-top: 2px;">Δs ideal: <strong style="color: #58a6ff;">${sugDist}m</strong></div>
+            </div>
+          `;
+        }
+
+        return `
+          <tr id="row-pass-${r.id}">
+            <td style="color: var(--sensor-a-color); font-weight: bold;">#${r.id}</td>
+            <td>${r.time}</td>
+            <td style="font-weight: 800; font-size: 0.95rem; color: ${r.overspeed ? '#ff3344' : '#fff'};">
+              ${r.kmh.toFixed(1)} km/h
+            </td>
+            <td style="background: rgba(56, 139, 253, 0.08);">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="number" step="0.1" min="0" placeholder="ex: 30.0" 
+                  value="${r.realKmh !== null ? r.realKmh : ''}" 
+                  oninput="handleRealSpeedChange(${r.id}, this.value)"
+                  style="width: 78px; padding: 3px 5px; font-size: 0.82rem; font-weight: 700; text-align: right; border-color: #388bfd; background: #0d1117; color: #58a6ff; border-radius: 4px;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">km/h</span>
+              </div>
+            </td>
+            <td id="comp-cell-${r.id}" style="background: rgba(56, 139, 253, 0.04);">${compHtml}</td>
+            <td style="color: var(--text-muted);">${r.ms.toFixed(2)}</td>
+            <td style="font-family: var(--font-mono); font-size: 0.82rem;">
+              ${r.deltaMs.toFixed(1)} ms
+              ${r.deltaUs ? `<div style="font-size: 0.68rem; color: #58a6ff; font-weight: 700;">${r.deltaUs} µs</div>` : ''}
+            </td>
+            <td>${r.trapDist.toFixed(2)} m</td>
+            <td style="color: var(--sensor-a-color); font-weight: 600;">
+              ${r.dir}
+              ${r.estLengthM ? `<div style="font-size: 0.68rem; color: var(--text-muted); font-weight: normal;">Comp: ${r.estLengthM.toFixed(2)}m</div>` : ''}
+            </td>
+            <td><span style="color: ${r.overspeed ? '#ff3344' : '#3fb950'}; font-weight: 600;">${r.overspeed ? '⚠ Excesso' : '✓ Normal'}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      updateCalibrationSummary();
+    }
+
+    window.handleRealSpeedChange = function(id, val) {
+      const row = speedHistory.find(r => r.id === id);
+      if (!row) return;
+      row.realKmh = (val !== '' && !isNaN(val)) ? parseFloat(val) : null;
+
+      const cell = document.getElementById(`comp-cell-${id}`);
+      if (cell) {
+        if (row.realKmh !== null && row.realKmh > 0) {
+          const diff = row.kmh - row.realKmh;
+          const errorPct = ((diff / row.realKmh) * 100);
+          const factor = row.realKmh / row.kmh;
+          const sugDist = (row.trapDist * factor).toFixed(3);
+          const isClose = Math.abs(diff) <= 1.5;
+          const col = isClose ? '#3fb950' : (diff > 0 ? '#ff7b72' : '#f0883e');
+          cell.innerHTML = `
+            <div style="font-size: 0.75rem; line-height: 1.2;">
+              <strong style="color: ${col};">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} km/h (${errorPct >= 0 ? '+' : ''}${errorPct.toFixed(0)}%)</strong>
+              <div style="color: var(--text-muted); font-size: 0.68rem; margin-top: 2px;">Δs ideal: <strong style="color: #58a6ff;">${sugDist}m</strong></div>
+            </div>
+          `;
+        } else {
+          cell.innerHTML = '<span style="color: var(--text-muted); font-size: 0.72rem;">Digite vel. real</span>';
+        }
+      }
+
+      sendTelemetry('REAL_SPEED_UPDATE', { id, realKmh: row.realKmh, measuredKmh: row.kmh });
+      updateCalibrationSummary();
+    };
+
+    function updateCalibrationSummary() {
+      const validRows = speedHistory.filter(r => r.realKmh !== null && r.realKmh > 0 && r.kmh > 0);
+      const banner = document.getElementById('calibrationBanner');
+      if (!banner) return;
+
+      if (validRows.length === 0) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      banner.style.display = 'flex';
+      let sumFactors = 0;
+      validRows.forEach(r => { sumFactors += (r.realKmh / r.kmh); });
+      const avgFactor = sumFactors / validRows.length;
+      const currentTrap = parseFloat(trapDistanceInput.value) || 0.50;
+      suggestedTrapDistGlobal = parseFloat((currentTrap * avgFactor).toFixed(3));
+
+      const statsEl = document.getElementById('calibStatsText');
+      if (statsEl) {
+        statsEl.innerHTML = `Comparando <strong>${validRows.length} passagem(ns)</strong> com a velocidade real do carro: Fator médio de ajuste é <strong>${avgFactor.toFixed(2)}x</strong>. Para o velocímetro bater 100% com o painel do carro, a distância física real deve ser configurada em <strong style="color: #388bfd; font-size: 0.95rem;">${suggestedTrapDistGlobal} metros</strong> (atualmente configurado em ${currentTrap.toFixed(2)}m).`;
+      }
+    }
+
+    const btnApplyCalib = document.getElementById('btnApplyCalib');
+    if (btnApplyCalib) {
+      btnApplyCalib.addEventListener('click', () => {
+        if (suggestedTrapDistGlobal && suggestedTrapDistGlobal > 0.001) {
+          trapDistanceInput.value = suggestedTrapDistGlobal;
+          if (writerDue) {
+            sendDueCommand('d' + suggestedTrapDistGlobal);
+          }
+          alert(`✓ Distância entre sensores (Δs) ajustada para ${suggestedTrapDistGlobal}m e sincronizada com o Arduino Due!`);
+          logTerm('CALIB', `🎯 Ajuste calibrado aplicado: Novo Δs = ${suggestedTrapDistGlobal}m.`);
+          updateCutoffs();
+          sendTelemetry('CALIBRATION_APPLIED', { newTrapDist: suggestedTrapDistGlobal });
+        }
+      });
+    }
+
+    btnClearHistory.addEventListener('click', () => {
+      speedHistory = [];
+      renderHistory();
+    });
+
+    btnExportCsv.addEventListener('click', () => {
+      if (speedHistory.length === 0) return alert('Nenhum dado para exportar!');
+      let csv = 'Numero,Horario,Velocidade_Medida_KmH,Velocidade_Real_Carro_KmH,Diferenca_KmH,Erro_Percentual,Fator_Ajuste,Distancia_Sugerida_m,Velocidade_m_s,Tempo_ms,Tempo_us,Distancia_Sensores_m,Sentido,Comprimento_Estimado_m,Excesso\n';
+      speedHistory.forEach(r => {
+        const realStr = r.realKmh !== null ? r.realKmh.toFixed(2) : '';
+        const diffStr = r.realKmh !== null ? (r.kmh - r.realKmh).toFixed(2) : '';
+        const errStr  = (r.realKmh !== null && r.realKmh > 0) ? (((r.kmh - r.realKmh) / r.realKmh) * 100).toFixed(1) + '%' : '';
+        const factorStr = (r.realKmh !== null && r.kmh > 0) ? (r.realKmh / r.kmh).toFixed(3) : '';
+        const sugDistStr = (r.realKmh !== null && r.kmh > 0) ? (r.trapDist * (r.realKmh / r.kmh)).toFixed(3) : '';
+        const usStr = r.deltaUs ? r.deltaUs : '';
+        const lenStr = r.estLengthM ? r.estLengthM.toFixed(2) : '';
+
+        csv += `${r.id},${r.time},${r.kmh.toFixed(2)},${realStr},${diffStr},${errStr},${factorStr},${sugDistStr},${r.ms.toFixed(2)},${r.deltaMs.toFixed(1)},${usStr},${r.trapDist.toFixed(3)},${r.dir},${lenStr},${r.overspeed}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `comparativo_velocidade_real_${Date.now()}.csv`; a.click();
+      URL.revokeObjectURL(url);
+      logTerm('CSV', '✓ Dados comparativos de velocidade real exportados para CSV.');
+    });
+
+    // ================================================================
+    // PROCESSAMENTO DOS SENSORES (DISPARO INSTANTÂNEO COM FILTRO ANTI-RUÍDO)
+    // ================================================================
+    let blockedCountA = 0, blockedCountB = 0;
+    let pendingTriggerTsA = 0, pendingTriggerTsB = 0;
+    function getFilterSamples() {
+      return parseInt(filterInput ? filterInput.value : 3) || 3;
+    }
+
+    function handleSensorA(distMeters, isValid, rawHexStr, rxTime) {
+      rateCountA++;
+      const nowTs = rxTime || performance.now();
+      distA = isValid ? distMeters : null;
+      distValA.innerText = isValid ? distMeters.toFixed(2) : '---';
+
+      if (rawHexStr) lastHexA.innerText = rawHexStr.substring(0, 23);
+
+      chartHistoryA.push(isValid ? distMeters : 0);
+      if (chartHistoryA.length > 80) chartHistoryA.shift();
+
+      if (isValid) {
+        commStatusA.innerText = '🟢 Leitura OK';
+        commStatusA.style.color = '#3fb950';
+      } else {
+        commStatusA.innerText = '🟡 Sem Eco / Feixe Obstruído';
+        commStatusA.style.color = '#d29922';
+      }
+
+      const bg = parseFloat(bgAInput.value) || 4.0;
+      const tol = parseFloat(tolAInput.value) || 0.5;
+      const cutoff = bg - tol;
+
+      // FILTRO INTELIGENTE ANTI-FALSO DISPARO:
+      // Exige 3 amostras consecutivas (~6ms em 500Hz) para descartar ruído do laser ou 1 pacote perdido.
+      // O cronômetro usa o instante EXATO da 1ª amostra de corte (zero atraso).
+      const hasBgCalibrated = (bg > 0.3);
+      const isDistanceTrigger = (isValid && distMeters < cutoff && distMeters > 0.04);
+      const isBeamInterrupted = (hasBgCalibrated && (!isValid || distMeters <= 0.04));
+
+      const rawBlocked = isDistanceTrigger || isBeamInterrupted;
+      const requiredSamples = getFilterSamples();
+
+      if (rawBlocked) {
+        if (blockedCountA === 0) {
+          pendingTriggerTsA = nowTs;
+        }
+        blockedCountA++;
+        if (blockedCountA >= requiredSamples && !isBlockedA) {
+          isBlockedA = true;
+          beamBadgeA.className = 'beam-pill beam-blocked';
+          beamBadgeA.innerText = isDistanceTrigger ? `🚨 OBJETO (${distMeters.toFixed(2)}m)` : `🚨 FEIXE CORTADO!`;
+          onFeixeDisparado('A', pendingTriggerTsA);
+        }
+      } else {
+        blockedCountA = 0;
+        if (isBlockedA && isValid && distMeters >= cutoff) {
+          isBlockedA = false;
+          beamBadgeA.className = 'beam-pill beam-clear';
+          beamBadgeA.innerText = '✓ FEIXE LIVRE';
+        }
+      }
+      drawDualChart();
+    }
+
+    function handleSensorB(distMeters, isValid, rawHexStr, rxTime) {
+      rateCountB++;
+      const nowTs = rxTime || performance.now();
+      distB = isValid ? distMeters : null;
+      distValB.innerText = isValid ? distMeters.toFixed(2) : '---';
+
+      if (rawHexStr) lastHexB.innerText = rawHexStr.substring(0, 23);
+
+      chartHistoryB.push(isValid ? distMeters : 0);
+      if (chartHistoryB.length > 80) chartHistoryB.shift();
+
+      if (isValid) {
+        commStatusB.innerText = '🟢 Leitura OK';
+        commStatusB.style.color = '#3fb950';
+      } else {
+        commStatusB.innerText = '🟡 Sem Eco / Feixe Obstruído';
+        commStatusB.style.color = '#d29922';
+      }
+
+      const bg = parseFloat(bgBInput.value) || 4.0;
+      const tol = parseFloat(tolBInput.value) || 0.5;
+      const cutoff = bg - tol;
+
+      const hasBgCalibrated = (bg > 0.3);
+      const isDistanceTrigger = (isValid && distMeters < cutoff && distMeters > 0.04);
+      const isBeamInterrupted = (hasBgCalibrated && (!isValid || distMeters <= 0.04));
+
+      const rawBlocked = isDistanceTrigger || isBeamInterrupted;
+      const requiredSamples = getFilterSamples();
+
+      if (rawBlocked) {
+        if (blockedCountB === 0) {
+          pendingTriggerTsB = nowTs;
+        }
+        blockedCountB++;
+        if (blockedCountB >= requiredSamples && !isBlockedB) {
+          isBlockedB = true;
+          beamBadgeB.className = 'beam-pill beam-blocked';
+          beamBadgeB.innerText = isDistanceTrigger ? `🚨 OBJETO (${distMeters.toFixed(2)}m)` : `🚨 FEIXE CORTADO!`;
+          onFeixeDisparado('B', pendingTriggerTsB);
+        }
+      } else {
+        blockedCountB = 0;
+        if (isBlockedB && isValid && distMeters >= cutoff) {
+          isBlockedB = false;
+          beamBadgeB.className = 'beam-pill beam-clear';
+          beamBadgeB.innerText = '✓ FEIXE LIVRE';
+        }
+      }
+      drawDualChart();
+    }
+
+    // Parser Multi-Protocolo com Timestamp de Recepção Instantâneo
+    function parseSensorChunk(rxBuf, handler, sensorTag, rxTime) {
+      let i = 0;
+      while (i <= rxBuf.length - 2) {
+        if (rxBuf[i] === 0xFB && rxBuf[i + 1] === 0x03) {
+          if (i + 4 > rxBuf.length) break;
+          const payloadLen = rxBuf[i + 3];
+          const totalLen = 4 + payloadLen + 1;
+          if (i + totalLen > rxBuf.length) break;
+
+          const frame = rxBuf.slice(i, i + totalLen);
+          let sum = 0;
+          for (let k = 0; k < totalLen - 1; k++) sum = (sum + frame[k]) & 0xFF;
+
+          const hexStr = Array.from(frame).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+
+          if (sum === frame[totalLen - 1]) {
+            const valid = (frame[4] | (frame[5] << 8)) === 1;
+            const rawDist = frame[6] | (frame[7] << 8);
+            handler(rawDist / 10.0, valid, hexStr, rxTime);
+          } else {
+            handler(0, false, hexStr + " (CRC ERRO)", rxTime);
+          }
+          i += totalLen;
+        } else if (rxBuf[i] === 0xAA) {
+          if (i + 9 > rxBuf.length) break;
+          const rawDist = (rxBuf[i + 6] << 8) | rxBuf[i + 7];
+          const hexStr = Array.from(rxBuf.slice(i, i + 9)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+          if (rawDist > 0 && rawDist < 60000) {
+            handler(rawDist / 1000.0, true, hexStr, rxTime);
+            i += 9;
+            continue;
+          }
+          i++;
+        } else {
+          i++;
+        }
+      }
+
+      try {
+        const text = new TextDecoder('ascii', { fatal: false }).decode(rxBuf);
+        const match = text.match(/([0-9]+\.[0-9]+)/);
+        if (match) {
+          const val = parseFloat(match[1]);
+          if (!isNaN(val) && val > 0.05 && val < 500) {
+            handler(val, true, text.trim(), rxTime);
+          }
+        }
+      } catch (e) {}
+
+      return i > 0 ? rxBuf.slice(i) : rxBuf;
+    }
+
+    // --- CONEXÃO SERIAL SENSOR A (COM AUTO-ACORDAR) ---
+    btnConnectA.addEventListener('click', async () => {
+      try {
+        const selectedBaud = parseInt(baudA.value) || 115200;
+        portA = await navigator.serial.requestPort();
+        await portA.open({ baudRate: selectedBaud, dataBits: 8, stopBits: 1, parity: 'none' });
+        badgeA.className = 'status-badge status-connected';
+        badgeA.innerText = `A: ${selectedBaud} bps`;
+        btnConnectA.disabled = true;
+        baudA.disabled = true;
+        sendTelemetry('PORT_CONNECT', { sensor: 'A', baud: selectedBaud });
+
+        if (isSim) stopSimulation();
+
+        keepReadingA = true;
+        commStatusA.innerText = 'Conectado. Enviando comandos...';
+        logTerm('A', `Porta A aberta a ${selectedBaud} bps.`);
+
+        // ACORDA O SENSOR AUTOMATICAMENTE NA CONEXÃO!
+        await wakeSensorPort(portA, 'A');
+
+        readLoopA();
+      } catch (e) {
+        logTerm('A', `Erro ao conectar: ${e.message}`);
+        commStatusA.innerText = 'Erro ao abrir';
+        commStatusA.style.color = '#f85149';
+        alert(`Erro Sensor A: ${e.message}`);
+      }
+    });
+
+    async function readLoopA() {
+      readerA = portA.readable.getReader();
+      while (keepReadingA) {
+        const { value, done } = await readerA.read();
+        if (done) break;
+        if (value) {
+          const rxTime = performance.now();
+          totalBytesA += value.length;
+          byteCounterA.innerText = `Sensor A: ${totalBytesA} bytes`;
+          const temp = new Uint8Array(rxBufferA.length + value.length);
+          temp.set(rxBufferA); temp.set(value, rxBufferA.length);
+          rxBufferA = parseSensorChunk(temp, handleSensorA, 'A', rxTime);
+        }
+      }
+    }
+
+    // --- CONEXÃO SERIAL SENSOR B (COM AUTO-ACORDAR) ---
+    btnConnectB.addEventListener('click', async () => {
+      try {
+        const selectedBaud = parseInt(baudB.value) || 115200;
+        portB = await navigator.serial.requestPort();
+        await portB.open({ baudRate: selectedBaud, dataBits: 8, stopBits: 1, parity: 'none' });
+        badgeB.className = 'status-badge status-connected';
+        badgeB.innerText = `B: ${selectedBaud} bps`;
+        btnConnectB.disabled = true;
+        baudB.disabled = true;
+        sendTelemetry('PORT_CONNECT', { sensor: 'B', baud: selectedBaud });
+
+        if (isSim) stopSimulation();
+
+        keepReadingB = true;
+        commStatusB.innerText = 'Conectado. Enviando comandos...';
+        logTerm('B', `Porta B aberta a ${selectedBaud} bps.`);
+
+        // ACORDA O SENSOR AUTOMATICAMENTE NA CONEXÃO!
+        await wakeSensorPort(portB, 'B');
+
+        readLoopB();
+      } catch (e) {
+        logTerm('B', `Erro ao conectar: ${e.message}`);
+        commStatusB.innerText = 'Erro ao abrir';
+        commStatusB.style.color = '#f85149';
+        alert(`Erro Sensor B: ${e.message}`);
+      }
+    });
+
+    async function readLoopB() {
+      readerB = portB.readable.getReader();
+      while (keepReadingB) {
+        const { value, done } = await readerB.read();
+        if (done) break;
+        if (value) {
+          const rxTime = performance.now();
+          totalBytesB += value.length;
+          byteCounterB.innerText = `Sensor B: ${totalBytesB} bytes`;
+          const temp = new Uint8Array(rxBufferB.length + value.length);
+          temp.set(rxBufferB); temp.set(value, rxBufferB.length);
+          rxBufferB = parseSensorChunk(temp, handleSensorB, 'B', rxTime);
+        }
+      }
+    }
+
+    // --- MODO SIMULAÇÃO ---
+    let isSim = false, simTimer = null;
+    let simBlockA = false, simBlockB = false;
+
+    btnSimulate.addEventListener('click', () => {
+      if (isSim) stopSimulation();
+      else startSimulation();
+    });
+
+    function startSimulation() {
+      isSim = true;
+      btnSimulate.innerText = 'Parar Simulação';
+      btnSimulate.style.borderColor = 'var(--accent-yellow)';
+      simPassButtons.style.display = 'inline-flex';
+      badgeA.className = 'status-badge status-connected'; badgeA.innerText = 'A: Simulando';
+      badgeB.className = 'status-badge status-connected'; badgeB.innerText = 'B: Simulando';
+
+      bgAInput.value = '4.50';
+      bgBInput.value = '4.50';
+      updateCutoffs();
+
+      simTimer = setInterval(() => {
+        if (!simBlockA) handleSensorA(4.50 + (Math.random() - 0.5) * 0.04, true);
+        if (!simBlockB) handleSensorB(4.50 + (Math.random() - 0.5) * 0.04, true);
+      }, 50);
+
+      logTerm('SIM', 'Simulação ativa: Paredes de fundo calibradas em 4.50m.');
+    }
+
+    function stopSimulation() {
+      isSim = false;
+      clearInterval(simTimer);
+      btnSimulate.innerText = 'Modo Simulação';
+      btnSimulate.style.borderColor = '#30363d';
+      simPassButtons.style.display = 'none';
+      if (!portA) { badgeA.className = 'status-badge status-disconnected'; badgeA.innerText = 'A: Off'; }
+      if (!portB) { badgeB.className = 'status-badge status-disconnected'; badgeB.innerText = 'B: Off'; }
+    }
+
+    function simularPassagem(speedKmH, forward = true) {
+      if (!isSim) return alert('Ative o Modo Simulação primeiro!');
+      const trapDist = parseFloat(trapDistanceInput.value) || 0.50;
+      const v_ms = speedKmH / 3.6;
+      const transitMs = (trapDist / v_ms) * 1000;
+
+      const first = forward ? 'A' : 'B';
+      const second = forward ? 'B' : 'A';
+
+      if (first === 'A') {
+        simBlockA = true;
+        handleSensorA(1.20, true);
+        setTimeout(() => { simBlockA = false; }, 100);
+      } else {
+        simBlockB = true;
+        handleSensorB(1.20, true);
+        setTimeout(() => { simBlockB = false; }, 100);
+      }
+
+      setTimeout(() => {
+        if (second === 'A') {
+          simBlockA = true;
+          handleSensorA(1.20, true);
+          setTimeout(() => { simBlockA = false; }, 100);
+        } else {
+          simBlockB = true;
+          handleSensorB(1.20, true);
+          setTimeout(() => { simBlockB = false; }, 100);
+        }
+      }, transitMs);
+    }
+
+    document.getElementById('btnSimPassSlow').addEventListener('click', () => simularPassagem(20, true));
+    document.getElementById('btnSimPassMed').addEventListener('click', () => simularPassagem(50, true));
+    document.getElementById('btnSimPassFast').addEventListener('click', () => simularPassagem(90, true));
+
+    // --- GRÁFICO DINÂMICO ---
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function drawDualChart() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.strokeStyle = '#21262d';
+      ctx.lineWidth = 1;
+      for (let y = 30; y < h; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      const total = Math.max(chartHistoryA.length, chartHistoryB.length);
+      if (total < 2) return;
+
+      const yMin = 0, yMax = 6.0;
+
+      function plot(arr, color) {
+        if (arr.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.2;
+        const step = w / (arr.length - 1);
+        for (let i = 0; i < arr.length; i++) {
+          const x = i * step;
+          const y = h - ((arr[i] - yMin) / (yMax - yMin) * (h - 30) + 15);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      plot(chartHistoryA, '#58a6ff');
+      plot(chartHistoryB, '#f0883e');
+    }
+  </script>
+</body>
+</html>
